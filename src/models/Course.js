@@ -6,11 +6,12 @@ const moduleSchema = new mongoose.Schema({
     required: true,
   },
   description: String,
-  videoUrl: String,
-  videoKey: String, // S3 key for deletion
-  duration: Number, // in seconds
+  videoUrl: String,         // Cloudflare CDN URL
+  cloudflareKey: String,   // Cloudflare R2 storage key (for deletion / signed URLs)
+  duration: Number,        // in seconds
   order: Number,
-  thumbnail: String,
+  thumbnail: String,       // Cloudflare image CDN URL
+  thumbnailKey: String,    // Cloudflare R2 image key
 });
 
 const assignmentSchema = new mongoose.Schema({
@@ -28,7 +29,7 @@ const courseSchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    required: [true, 'Course description is required'],
+    default: '',
   },
   instructor: {
     type: String,
@@ -36,11 +37,11 @@ const courseSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    required: true,
+    default: 'General',
   },
   price: {
     type: Number,
-    required: true,
+    default: 0,
     min: 0,
   },
   isFree: {
@@ -63,6 +64,10 @@ const courseSchema = new mongoose.Schema({
   assignments: [assignmentSchema],
   totalMaterials: {
     type: Number,
+    default: 0,
+  },
+  cloudflareStorageUsed: {
+    type: Number, // total bytes stored in Cloudflare R2 for this course
     default: 0,
   },
   rating: {

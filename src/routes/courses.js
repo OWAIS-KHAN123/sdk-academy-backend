@@ -31,7 +31,12 @@ router.get('/free', getFreeCourses);
 
 router.route('/:id')
   .get(getCourse)
-  .put(protect, authorize('admin'), updateCourse)
+  .put(
+    protect,
+    authorize('admin'),
+    upload.fields([{ name: 'thumbnail', maxCount: 1 }]),
+    updateCourse
+  )
   .delete(protect, authorize('admin'), deleteCourse);
 
 router.post(

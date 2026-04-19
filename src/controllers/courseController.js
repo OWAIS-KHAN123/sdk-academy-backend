@@ -1,6 +1,7 @@
 const Course = require('../models/Course');
 const Enrollment = require('../models/Enrollment');
-const { uploadToS3 } = require('../config/s3');
+const VideoMetadata = require('../models/VideoMetadata');
+const { uploadToR2, deleteFromR2 } = require('../config/cloudflare');
 
 // @desc    Get all courses
 // @route   GET /api/v1/courses
@@ -146,15 +147,20 @@ exports.createCourse = async (req, res, next) => {
 
     // Upload thumbnail if provided
     if (req.files && req.files.thumbnail) {
-      req.body.thumbnail = await uploadToS3(req.files.thumbnail[0], 'thumbnails');
+      const { url, key } = await uploadToR2(req.files.thumbnail[0], 'thumbnails', 'image');
+      req.body.thumbnail = url;
+      req.body.thumbnailKey = key;
     }
 
     // Upload promotional video if provided
     if (req.files && req.files.promotionalVideo) {
-      req.body.promotionalVideo = await uploadToS3(
+      const { url, key } = await uploadToR2(
         req.files.promotionalVideo[0],
-        'promotional-videos'
+        'promotional-videos',
+        'video'
       );
+      req.body.promotionalVideo = url;
+      req.body.promotionalVideoKey = key;
     }
 
     const course = await Course.create(req.body);
@@ -180,6 +186,17 @@ exports.updateCourse = async (req, res, next) => {
         success: false,
         message: 'Course not found',
       });
+    }
+
+    // Upload new thumbnail if provided
+    if (req.files && req.files.thumbnail) {
+      // Delete old thumbnail from R2 if it exists
+      if (course.thumbnailKey) {
+        try { await deleteFromR2(course.thumbnailKey, 'image'); } catch (_) {}
+      }
+      const { url, key } = await uploadToR2(req.files.thumbnail[0], 'thumbnails', 'image');
+      req.body.thumbnail = url;
+      req.body.thumbnailKey = key;
     }
 
     course = await Course.findByIdAndUpdate(req.params.id, req.body, {
@@ -237,10 +254,26 @@ exports.addModule = async (req, res, next) => {
       });
     }
 
-    // Upload video
+    // Upload video to Cloudflare R2
     if (req.file) {
-      const videoUrl = await uploadToS3(req.file, 'course-videos');
-      req.body.videoUrl = videoUrl;
+      const { url, key } = await uploadToR2(req.file, 'course-videos', 'video');
+      req.body.videoUrl = url;
+      req.body.cloudflareKey = key;
+
+      // Save VideoMetadata record
+      const moduleIndex = course.modules.length; // will be pushed next
+      await VideoMetadata.create({
+        courseId: course._id,
+        moduleIndex,
+        cloudflareKey: key,
+        cloudflareCdnUrl: url,
+        videoSize: req.file.size || 0,
+        videoFormat: (req.file.mimetype || '').split('/')[1] || 'unknown',
+        uploadedBy: req.user.id,
+      });
+
+      // Update storage usage on course
+      course.cloudflareStorageUsed = (course.cloudflareStorageUsed || 0) + (req.file.size || 0);
     }
 
     course.modules.push(req.body);

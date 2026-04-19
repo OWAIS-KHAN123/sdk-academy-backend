@@ -17,6 +17,8 @@ const enrollmentRoutes = require('./routes/enrollments');
 const messageRoutes = require('./routes/messages');
 const testimonialRoutes = require('./routes/testimonials');
 const notificationRoutes = require('./routes/notifications');
+const videoRoutes = require('./routes/videos');
+const adminRoutes = require('./routes/admin');
 
 // Connect to database
 connectDB();
@@ -57,6 +59,8 @@ app.use('/api/v1/enrollments', enrollmentRoutes);
 app.use('/api/v1/messages', messageRoutes);
 app.use('/api/v1/testimonials', testimonialRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/videos', videoRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 // Error handler
 app.use(errorHandler);
