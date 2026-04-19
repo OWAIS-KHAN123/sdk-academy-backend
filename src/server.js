@@ -35,12 +35,18 @@ const io = socketio(server, {
 // Make io accessible to routes
 app.set('io', io);
 
+// CORS must be first — before body parser and routes
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // handle preflight for all routes
+
 // Body parser
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Enable CORS
-app.use(cors());
 
 // Dev logging middleware
 if (process.env.NODE_ENV === 'development') {
