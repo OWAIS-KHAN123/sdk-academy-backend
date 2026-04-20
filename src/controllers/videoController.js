@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const VideoMetadata = require('../models/VideoMetadata');
 const Course = require('../models/Course');
 const Enrollment = require('../models/Enrollment');
@@ -168,10 +169,13 @@ exports.getStreamUrl = async (req, res, next) => {
 
     let targetCourseId = metadata.courseId;
     if (req.query.courseId && req.query.courseId !== String(metadata.courseId)) {
-      const course = await Course.findById(req.query.courseId);
-      if (course && course.modules.some(m => m.cloudflareKey === metadata.cloudflareKey)) {
-        targetCourseId = req.query.courseId;
-      }
+      try {
+        const qId = new mongoose.Types.ObjectId(req.query.courseId);
+        const course = await Course.findById(qId).select('_id modules');
+        if (course && course.modules.some((m) => m.cloudflareKey === metadata.cloudflareKey)) {
+          targetCourseId = qId;
+        }
+      } catch (_) {}
     }
 
     if (req.user.role !== 'admin') {
@@ -228,10 +232,13 @@ exports.getDownloadUrl = async (req, res, next) => {
 
     let targetCourseId = metadata.courseId;
     if (req.query.courseId && req.query.courseId !== String(metadata.courseId)) {
-      const course = await Course.findById(req.query.courseId);
-      if (course && course.modules.some(m => m.cloudflareKey === metadata.cloudflareKey)) {
-        targetCourseId = req.query.courseId;
-      }
+      try {
+        const qId = new mongoose.Types.ObjectId(req.query.courseId);
+        const course = await Course.findById(qId).select('_id modules');
+        if (course && course.modules.some((m) => m.cloudflareKey === metadata.cloudflareKey)) {
+          targetCourseId = qId;
+        }
+      } catch (_) {}
     }
 
     if (req.user.role !== 'admin') {

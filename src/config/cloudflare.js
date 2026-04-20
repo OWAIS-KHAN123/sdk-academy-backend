@@ -1,4 +1,4 @@
-const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, PutBucketCorsCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
@@ -130,6 +130,33 @@ const getObjectMetadata = async (key, type = 'video') => {
   };
 };
 
+// Ensure R2 bucket allows browser PUT uploads (CORS).
+// Called once per process; idempotent so safe to repeat on serverless cold-starts.
+let _r2CorsReady = false;
+const ensureR2Cors = async () => {
+  if (_r2CorsReady) return;
+  try {
+    await r2Client.send(new PutBucketCorsCommand({
+      Bucket: VIDEO_BUCKET,
+      CORSConfiguration: {
+        CORSRules: [
+          {
+            AllowedOrigins: ['*'],
+            AllowedMethods: ['GET', 'PUT', 'DELETE', 'HEAD'],
+            AllowedHeaders: ['*'],
+            ExposeHeaders: ['ETag'],
+            MaxAgeSeconds: 86400,
+          },
+        ],
+      },
+    }));
+    _r2CorsReady = true;
+  } catch (err) {
+    // Non-fatal — log but don't block the upload attempt
+    console.warn('[R2] CORS setup warning:', err.message);
+  }
+};
+
 /**
  * Generate a presigned PUT URL so the mobile app can upload directly to R2,
  * bypassing Vercel's 4.5 MB body limit entirely.
@@ -140,6 +167,9 @@ const getObjectMetadata = async (key, type = 'video') => {
  * @returns {{ presignedUrl: string, key: string }}
  */
 const generatePresignedUploadUrl = async (folder, filename, contentType = 'video/mp4', expiresIn = 3600) => {
+  // Configure CORS on the bucket so browsers can PUT directly without being blocked
+  await ensureR2Cors();
+
   const ext = path.extname(filename) || '.mp4';
   const key = `${folder}/${uuidv4()}${ext}`;
 
@@ -158,6 +188,7 @@ module.exports = {
   uploadToR2,
   generateSignedUrl,
   generatePresignedUploadUrl,
+  ensureR2Cors,
   deleteFromR2,
   getStorageStats,
   getObjectMetadata,
