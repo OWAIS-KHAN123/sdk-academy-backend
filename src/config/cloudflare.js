@@ -151,9 +151,11 @@ const ensureR2Cors = async () => {
       },
     }));
     _r2CorsReady = true;
+    console.log('[R2] CORS configured successfully on bucket:', VIDEO_BUCKET);
   } catch (err) {
-    // Non-fatal — log but don't block the upload attempt
-    console.warn('[R2] CORS setup warning:', err.message);
+    // This fails if the API token lacks bucket-settings permission.
+    // Fix: configure CORS manually in Cloudflare dashboard → R2 → bucket → Settings → CORS Policy.
+    console.error('[R2] CORS setup FAILED (manual dashboard config may be needed):', err.message);
   }
 };
 
