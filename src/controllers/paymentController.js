@@ -2,7 +2,7 @@ const Payment = require('../models/Payment');
 const Enrollment = require('../models/Enrollment');
 const Course = require('../models/Course');
 const Notification = require('../models/Notification');
-const { uploadToS3 } = require('../config/s3');
+const { uploadToR2 } = require('../config/cloudflare');
 
 // @desc    Submit purchase request
 // @route   POST /api/v1/payments/request
@@ -50,7 +50,7 @@ exports.submitPurchaseRequest = async (req, res, next) => {
       });
     }
 
-    const screenshotUrl = await uploadToS3(req.file, 'payment-screenshots');
+    const { url: screenshotUrl } = await uploadToR2(req.file, 'payment-screenshots', 'image');
 
     // Create payment record
     const payment = await Payment.create({

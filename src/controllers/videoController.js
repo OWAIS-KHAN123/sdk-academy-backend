@@ -166,14 +166,26 @@ exports.getStreamUrl = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Video not found' });
     }
 
+    let targetCourseId = metadata.courseId;
+    if (req.query.courseId && req.query.courseId !== String(metadata.courseId)) {
+      const course = await Course.findById(req.query.courseId);
+      if (course && course.modules.some(m => m.cloudflareKey === metadata.cloudflareKey)) {
+        targetCourseId = req.query.courseId;
+      }
+    }
+
     if (req.user.role !== 'admin') {
-      const enrollment = await Enrollment.findOne({
-        userId: req.user.id,
-        courseId: metadata.courseId,
-        status: 'active',
-      });
-      if (!enrollment) {
-        return res.status(403).json({ success: false, message: 'You are not enrolled in this course' });
+      const course = await Course.findById(targetCourseId).select('isFree');
+      const isFree = course?.isFree === true;
+      if (!isFree) {
+        const enrollment = await Enrollment.findOne({
+          userId: req.user.id,
+          courseId: targetCourseId,
+          status: { $in: ['active', 'completed'] },
+        });
+        if (!enrollment) {
+          return res.status(403).json({ success: false, message: 'You are not enrolled in this course' });
+        }
       }
     }
 
@@ -214,14 +226,26 @@ exports.getDownloadUrl = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Video not found' });
     }
 
+    let targetCourseId = metadata.courseId;
+    if (req.query.courseId && req.query.courseId !== String(metadata.courseId)) {
+      const course = await Course.findById(req.query.courseId);
+      if (course && course.modules.some(m => m.cloudflareKey === metadata.cloudflareKey)) {
+        targetCourseId = req.query.courseId;
+      }
+    }
+
     if (req.user.role !== 'admin') {
-      const enrollment = await Enrollment.findOne({
-        userId: req.user.id,
-        courseId: metadata.courseId,
-        status: 'active',
-      });
-      if (!enrollment) {
-        return res.status(403).json({ success: false, message: 'You are not enrolled in this course' });
+      const course = await Course.findById(targetCourseId).select('isFree');
+      const isFree = course?.isFree === true;
+      if (!isFree) {
+        const enrollment = await Enrollment.findOne({
+          userId: req.user.id,
+          courseId: targetCourseId,
+          status: { $in: ['active', 'completed'] },
+        });
+        if (!enrollment) {
+          return res.status(403).json({ success: false, message: 'You are not enrolled in this course' });
+        }
       }
     }
 

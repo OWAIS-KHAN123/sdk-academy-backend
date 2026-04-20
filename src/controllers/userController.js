@@ -1,5 +1,5 @@
 const User = require('../models/User');
-const { uploadToS3 } = require('../config/s3');
+const { uploadToR2 } = require('../config/cloudflare');
 
 // @desc    Get user profile
 // @route   GET /api/v1/users/profile
@@ -60,7 +60,7 @@ exports.uploadAvatar = async (req, res, next) => {
       });
     }
 
-    const imageUrl = await uploadToS3(req.file, 'avatars');
+    const { url: imageUrl } = await uploadToR2(req.file, 'avatars', 'image');
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
@@ -89,8 +89,8 @@ exports.uploadIdCard = async (req, res, next) => {
       });
     }
 
-    const frontUrl = await uploadToS3(req.files.front[0], 'identity-cards');
-    const backUrl = await uploadToS3(req.files.back[0], 'identity-cards');
+    const { url: frontUrl } = await uploadToR2(req.files.front[0], 'identity-cards', 'image');
+    const { url: backUrl } = await uploadToR2(req.files.back[0], 'identity-cards', 'image');
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
