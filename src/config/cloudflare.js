@@ -172,14 +172,16 @@ const generatePresignedUploadUrl = async (folder, filename, contentType = 'video
   const ext = path.extname(filename) || '.mp4';
   const key = `${folder}/${uuidv4()}${ext}`;
 
+  // ContentType intentionally omitted from signing — including it makes content-type
+  // a required signed header which breaks CORS preflight on R2. The actual PUT
+  // still sends Content-Type and R2 stores it from the request header.
   const command = new PutObjectCommand({
     Bucket: VIDEO_BUCKET,
     Key: key,
-    ContentType: contentType,
   });
 
   const presignedUrl = await getSignedUrl(r2Client, command, { expiresIn });
-  return { presignedUrl, key };
+  return { presignedUrl, key, contentType };
 };
 
 module.exports = {
