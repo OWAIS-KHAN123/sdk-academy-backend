@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Message = require('../models/Message');
 const User = require('../models/User');
 const Enrollment = require('../models/Enrollment');
@@ -10,7 +11,8 @@ const generateConversationId = (id1, id2) => [id1.toString(), id2.toString()].so
 // @route   GET /api/v1/messages/conversations
 exports.getConversations = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    // Must cast to ObjectId — aggregation $match doesn't auto-cast strings
+    const userId = new mongoose.Types.ObjectId(req.user.id);
 
     const groups = await Message.aggregate([
       { $match: { $or: [{ senderId: userId }, { receiverId: userId }] } },
@@ -69,7 +71,7 @@ exports.getMessages = async (req, res, next) => {
 
     // Mark unread messages from other user as read
     await Message.updateMany(
-      { conversationId, receiverId: userId, isRead: false },
+      { conversationId, receiverId: new mongoose.Types.ObjectId(userId), isRead: false },
       { $set: { isRead: true } }
     );
 
