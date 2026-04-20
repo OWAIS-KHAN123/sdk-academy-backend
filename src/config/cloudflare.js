@@ -169,9 +169,6 @@ const ensureR2Cors = async () => {
  * @returns {{ presignedUrl: string, key: string }}
  */
 const generatePresignedUploadUrl = async (folder, filename, contentType = 'video/mp4', expiresIn = 3600) => {
-  // Configure CORS on the bucket so browsers can PUT directly without being blocked
-  await ensureR2Cors();
-
   const ext = path.extname(filename) || '.mp4';
   const key = `${folder}/${uuidv4()}${ext}`;
 
