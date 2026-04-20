@@ -13,7 +13,12 @@ const messageSchema = new mongoose.Schema({
   },
   message: {
     type: String,
-    required: true,
+    default: '',
+  },
+  messageType: {
+    type: String,
+    enum: ['text', 'system', 'enrollment_approved', 'enrollment_rejected'],
+    default: 'text',
   },
   attachments: [{
     type: {
