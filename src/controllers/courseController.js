@@ -96,24 +96,18 @@ exports.getCourse = async (req, res, next) => {
   }
 };
 
-// @desc    Get featured course
+// @desc    Get featured courses
 // @route   GET /api/v1/courses/featured
 // @access  Public
 exports.getFeaturedCourse = async (req, res, next) => {
   try {
-    const course = await Course.findOne({ isFeatured: true, isActive: true })
-      .populate('createdBy', 'name');
-
-    if (!course) {
-      return res.status(404).json({
-        success: false,
-        message: 'No featured course found',
-      });
-    }
+    const courses = await Course.find({ isFeatured: true, isActive: true })
+      .populate('createdBy', 'name')
+      .sort({ updatedAt: -1 });
 
     res.status(200).json({
       success: true,
-      course,
+      courses,
     });
   } catch (error) {
     next(error);
