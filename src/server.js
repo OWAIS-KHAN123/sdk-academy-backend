@@ -19,6 +19,7 @@ const testimonialRoutes = require('./routes/testimonials');
 const notificationRoutes = require('./routes/notifications');
 const videoRoutes = require('./routes/videos');
 const adminRoutes = require('./routes/admin');
+const promoVideoRoutes = require('./routes/promoVideos');
 
 // Connect to database
 connectDB();
@@ -67,6 +68,7 @@ app.use('/api/v1/testimonials', testimonialRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/videos', videoRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/promo-videos', promoVideoRoutes);
 
 // Error handler
 app.use(errorHandler);
