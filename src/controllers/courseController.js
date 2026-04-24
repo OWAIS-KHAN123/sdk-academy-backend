@@ -14,6 +14,7 @@ exports.getCourses = async (req, res, next) => {
       minPrice,
       maxPrice,
       isFree,
+      minRating,
       sort = '-createdAt',
       page = 1,
       limit = 10,
@@ -38,6 +39,10 @@ exports.getCourses = async (req, res, next) => {
       query.price = {};
       if (minPrice) query.price.$gte = Number(minPrice);
       if (maxPrice) query.price.$lte = Number(maxPrice);
+    }
+
+    if (minRating) {
+      query.rating = { $gte: Number(minRating) };
     }
 
     // Execute query
