@@ -1,4 +1,5 @@
 const Notification = require('../models/Notification');
+const User = require('../models/User');
 
 // @desc    Get user notifications
 // @route   GET /api/v1/notifications
@@ -73,28 +74,59 @@ exports.markAllAsRead = async (req, res, next) => {
   }
 };
 
-// @desc    Send notification (Admin)
+// @desc    Send notification (Admin) — single user or bulk broadcast
 // @route   POST /api/v1/notifications/send
 // @access  Private/Admin
 exports.sendNotification = async (req, res, next) => {
   try {
-    const { userId, title, message, type, referenceId } = req.body;
+    const { userId, title, message, type, referenceId, courseId, bulk } = req.body;
+
+    if (!title || !message || !type) {
+      return res.status(400).json({ success: false, message: 'title, message and type are required' });
+    }
+
+    const ref = referenceId || courseId || undefined;
+    const io = req.app.get('io');
+
+    if (bulk) {
+      const users = await User.find({ isActive: true, role: 'student' }).select('_id');
+      if (users.length === 0) {
+        return res.status(200).json({ success: true, count: 0, message: 'No active students found' });
+      }
+
+      const docs = users.map((u) => ({
+        userId: u._id,
+        title,
+        message,
+        type,
+        ...(ref && { referenceId: ref }),
+      }));
+
+      await Notification.insertMany(docs);
+
+      users.forEach((u) => {
+        try { io.to(u._id.toString()).emit('new-notification', { title, message, type }); } catch {}
+      });
+
+      return res.status(201).json({ success: true, count: users.length });
+    }
+
+    // Individual
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId is required for individual notification' });
+    }
 
     const notification = await Notification.create({
       userId,
       title,
       message,
       type,
-      referenceId,
+      ...(ref && { referenceId: ref }),
     });
 
-    // Emit socket event
-    req.app.get('io').to(userId).emit('new-notification', notification);
+    try { io.to(userId.toString()).emit('new-notification', notification); } catch {}
 
-    res.status(201).json({
-      success: true,
-      notification,
-    });
+    res.status(201).json({ success: true, notification });
   } catch (error) {
     next(error);
   }
