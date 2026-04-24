@@ -4,6 +4,7 @@ const {
   updateProfile,
   uploadAvatar,
   uploadIdCard,
+  changePassword,
 } = require('../controllers/userController');
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -16,14 +17,8 @@ router.route('/profile')
   .get(getProfile)
   .put(updateProfile);
 
-router.post('/upload-avatar', upload.single('avatar'), uploadAvatar);
-router.post(
-  '/upload-id',
-  upload.fields([
-    { name: 'front', maxCount: 1 },
-    { name: 'back', maxCount: 1 },
-  ]),
-  uploadIdCard
-);
+router.post('/upload-avatar', upload.single('image'), uploadAvatar);
+router.post('/upload-id', upload.single('image'), uploadIdCard);
+router.put('/change-password', changePassword);
 
 module.exports = router;

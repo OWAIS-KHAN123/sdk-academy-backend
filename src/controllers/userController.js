@@ -30,6 +30,10 @@ exports.updateProfile = async (req, res, next) => {
       address: req.body.address,
     };
 
+    if (req.body.identityCard) {
+      fieldsToUpdate['identityCard.idNumber'] = req.body.identityCard.idNumber;
+    }
+
     const user = await User.findByIdAndUpdate(
       req.user.id,
       fieldsToUpdate,
@@ -77,34 +81,81 @@ exports.uploadAvatar = async (req, res, next) => {
   }
 };
 
-// @desc    Upload identity card
+// @desc    Upload identity card (one side at a time)
 // @route   POST /api/v1/users/upload-id
 // @access  Private
 exports.uploadIdCard = async (req, res, next) => {
   try {
-    if (!req.files || !req.files.front || !req.files.back) {
+    if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'Please upload both front and back images',
+        message: 'Please upload an image',
       });
     }
 
-    const { url: frontUrl } = await uploadToR2(req.files.front[0], 'identity-cards', 'image');
-    const { url: backUrl } = await uploadToR2(req.files.back[0], 'identity-cards', 'image');
+    const { side } = req.body;
+    if (!side || !['front', 'back'].includes(side)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please specify side as "front" or "back"',
+      });
+    }
+
+    const { url } = await uploadToR2(req.file, 'identity-cards', 'image');
+    const updateField = side === 'front' ? 'identityCard.frontImage' : 'identityCard.backImage';
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      {
-        'identityCard.frontImage': frontUrl,
-        'identityCard.backImage': backUrl,
-        'identityCard.idNumber': req.body.idNumber,
-      },
+      { [updateField]: url },
       { new: true }
     );
 
     res.status(200).json({
       success: true,
       user,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Change password
+// @route   PUT /api/v1/users/change-password
+// @access  Private
+exports.changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide current and new password',
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters',
+      });
+    }
+
+    const user = await User.findById(req.user.id).select('+password');
+    const isMatch = await user.comparePassword(currentPassword);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect',
+      });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully',
     });
   } catch (error) {
     next(error);
