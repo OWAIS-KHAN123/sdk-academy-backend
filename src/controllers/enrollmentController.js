@@ -51,7 +51,7 @@ exports.getEnrollment = async (req, res, next) => {
 // @access  Private
 exports.updateProgress = async (req, res, next) => {
   try {
-    const { moduleIndex, lastPosition, isCompleted } = req.body;
+    const { moduleIndex, lastPosition, isCompleted, timeSpent } = req.body;
 
     const enrollment = await Enrollment.findOne({
       userId: req.user.id,
@@ -69,33 +69,28 @@ exports.updateProgress = async (req, res, next) => {
 
     if (isCompleted && !enrollment.progress.completedModules.includes(moduleIndex)) {
       enrollment.progress.completedModules.push(moduleIndex);
-      
-      // Remove from in-progress
       enrollment.progress.inProgressModules = enrollment.progress.inProgressModules.filter(
         m => m.moduleIndex !== moduleIndex
       );
-    } else if (!isCompleted) {
-      // Update in-progress
+    } else if (!isCompleted && lastPosition != null) {
       const inProgressIndex = enrollment.progress.inProgressModules.findIndex(
         m => m.moduleIndex === moduleIndex
       );
-
       if (inProgressIndex > -1) {
         enrollment.progress.inProgressModules[inProgressIndex].lastPosition = lastPosition;
       } else {
-        enrollment.progress.inProgressModules.push({
-          moduleIndex,
-          lastPosition,
-        });
+        enrollment.progress.inProgressModules.push({ moduleIndex, lastPosition });
       }
     }
 
-    // Calculate overall percentage
+    if (timeSpent) {
+      enrollment.progress.totalTimeSpent = (enrollment.progress.totalTimeSpent || 0) + timeSpent;
+    }
+
     const totalModules = course.modules.length;
     const completedCount = enrollment.progress.completedModules.length;
     enrollment.progress.overallPercentage = Math.round((completedCount / totalModules) * 100);
 
-    // Check if course is completed
     if (enrollment.progress.overallPercentage === 100 && enrollment.status !== 'completed') {
       enrollment.status = 'completed';
       enrollment.completionDate = Date.now();
