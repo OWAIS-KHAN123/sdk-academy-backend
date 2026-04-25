@@ -154,16 +154,81 @@ exports.rejectTestimonial = async (req, res, next) => {
       });
     }
 
+    const wasApproved = testimonial.status === 'approved';
     testimonial.status = 'rejected';
     testimonial.moderatedBy = req.user.id;
     testimonial.moderatedAt = Date.now();
     await testimonial.save();
+
+    if (wasApproved) {
+      const course = await Course.findById(testimonial.courseId);
+      if (course) {
+        const allRatings = await Testimonial.find({ courseId: testimonial.courseId, status: 'approved' });
+        course.rating = allRatings.length ? allRatings.reduce((s, t) => s + t.rating, 0) / allRatings.length : 0;
+        course.totalRatings = allRatings.length;
+        await course.save();
+      }
+    }
 
     res.status(200).json({
       success: true,
       message: 'Testimonial rejected',
       testimonial,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all testimonials (admin)
+// @route   GET /api/v1/testimonials/all
+// @access  Private/Admin
+exports.getAllTestimonials = async (req, res, next) => {
+  try {
+    const { status } = req.query;
+    const query = status ? { status } : {};
+
+    const testimonials = await Testimonial.find(query)
+      .populate('userId', 'name email profileImage')
+      .populate('courseId', 'title')
+      .sort('-submittedAt');
+
+    res.status(200).json({
+      success: true,
+      count: testimonials.length,
+      testimonials,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete testimonial
+// @route   DELETE /api/v1/testimonials/:id
+// @access  Private/Admin
+exports.deleteTestimonial = async (req, res, next) => {
+  try {
+    const testimonial = await Testimonial.findById(req.params.id);
+
+    if (!testimonial) {
+      return res.status(404).json({ success: false, message: 'Testimonial not found' });
+    }
+
+    const wasApproved = testimonial.status === 'approved';
+    const courseId = testimonial.courseId;
+    await testimonial.deleteOne();
+
+    if (wasApproved) {
+      const course = await Course.findById(courseId);
+      if (course) {
+        const allRatings = await Testimonial.find({ courseId, status: 'approved' });
+        course.rating = allRatings.length ? allRatings.reduce((s, t) => s + t.rating, 0) / allRatings.length : 0;
+        course.totalRatings = allRatings.length;
+        await course.save();
+      }
+    }
+
+    res.status(200).json({ success: true, message: 'Testimonial deleted' });
   } catch (error) {
     next(error);
   }
