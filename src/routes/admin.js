@@ -6,6 +6,7 @@ const {
   unsuspendUser,
   manualEnroll,
   getCloudflareStorage,
+  getStorageVideos,
 } = require('../controllers/adminController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -20,5 +21,6 @@ router.put('/users/:id/suspend', suspendUser);
 router.put('/users/:id/unsuspend', unsuspendUser);
 router.post('/users/:id/enroll', manualEnroll);
 router.get('/cloudflare/storage', getCloudflareStorage);
+router.get('/storage/videos', getStorageVideos);
 
 module.exports = router;

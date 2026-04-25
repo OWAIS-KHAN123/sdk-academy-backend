@@ -193,8 +193,13 @@ exports.getCloudflareStorage = async (req, res, next) => {
       getStorageStats('image'),
     ]);
 
+    const totalBytes = videoStats.totalSize + imageStats.totalSize;
+
     res.status(200).json({
       success: true,
+      totalBytes,
+      totalVideos: videoStats.totalObjects,
+      totalImages: imageStats.totalObjects,
       videos: {
         count: videoStats.totalObjects,
         sizeBytes: videoStats.totalSize,
@@ -205,10 +210,38 @@ exports.getCloudflareStorage = async (req, res, next) => {
         sizeBytes: imageStats.totalSize,
         sizeMB: parseFloat((imageStats.totalSize / (1024 * 1024)).toFixed(2)),
       },
-      totalSizeMB: parseFloat(
-        ((videoStats.totalSize + imageStats.totalSize) / (1024 * 1024)).toFixed(2)
-      ),
+      totalSizeMB: parseFloat((totalBytes / (1024 * 1024)).toFixed(2)),
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─────────────────────────────────────────────
+// @desc    List stored videos (from VideoMetadata)
+// @route   GET /api/v1/admin/storage/videos
+// @access  Private/Admin
+// ─────────────────────────────────────────────
+exports.getStorageVideos = async (req, res, next) => {
+  try {
+    const VideoMetadata = require('../models/VideoMetadata');
+    const videos = await VideoMetadata.find()
+      .populate('courseId', 'title')
+      .sort('-uploadedAt')
+      .lean();
+
+    const mapped = videos.map((v) => ({
+      key: v.cloudflareKey,
+      title: v.courseId?.title
+        ? `${v.courseId.title} — Module ${v.moduleIndex + 1}`
+        : v.cloudflareKey,
+      courseTitle: v.courseId?.title || 'Uncategorized',
+      size: v.videoSize,
+      lastModified: v.uploadedAt,
+      format: v.videoFormat,
+    }));
+
+    res.status(200).json({ success: true, videos: mapped });
   } catch (error) {
     next(error);
   }
