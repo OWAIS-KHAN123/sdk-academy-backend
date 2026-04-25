@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Course = require('../models/Course');
 const Enrollment = require('../models/Enrollment');
 const Payment = require('../models/Payment');
+const Testimonial = require('../models/Testimonial');
 const { getStorageStats } = require('../config/cloudflare');
 
 // ─────────────────────────────────────────────
@@ -12,11 +13,12 @@ const { getStorageStats } = require('../config/cloudflare');
 exports.getDashboard = async (req, res, next) => {
   try {
     const [
-      totalUsers,
+      totalStudents,
       totalCourses,
       totalEnrollments,
       revenueResult,
-      pendingPayments,
+      pendingApprovals,
+      pendingTestimonials,
       recentUsers,
       recentEnrollments,
     ] = await Promise.all([
@@ -28,6 +30,7 @@ exports.getDashboard = async (req, res, next) => {
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
       Payment.countDocuments({ status: 'pending' }),
+      Testimonial.countDocuments({ status: 'pending' }),
       User.find({ role: 'student' })
         .sort('-createdAt')
         .limit(5)
@@ -42,11 +45,12 @@ exports.getDashboard = async (req, res, next) => {
     res.status(200).json({
       success: true,
       stats: {
-        totalUsers,
+        totalStudents,
         totalCourses,
         totalEnrollments,
         totalRevenue: revenueResult[0]?.total || 0,
-        pendingPayments,
+        pendingApprovals,
+        pendingTestimonials,
       },
       recentUsers,
       recentEnrollments,
