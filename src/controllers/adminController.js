@@ -30,7 +30,7 @@ exports.getDashboard = async (req, res, next) => {
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
       Payment.countDocuments({ status: 'pending' }),
-      Testimonial.countDocuments({ status: 'pending' }),
+      Testimonial.countDocuments(),
       User.find({ role: 'student' })
         .sort('-createdAt')
         .limit(5)
