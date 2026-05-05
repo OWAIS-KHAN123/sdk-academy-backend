@@ -49,10 +49,8 @@ app.options('*', cors(corsOptions)); // handle preflight for all routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Dev logging middleware
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-}
+// HTTP request logging (always on so production logs are visible on Render)
+app.use(morgan('dev'));
 
 // Rate limiting (Disabled for development)
 // app.use('/api', limiter);

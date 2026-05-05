@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const { sendOtpEmail } = require('../utils/emailService');
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -120,32 +121,93 @@ exports.getMe = async (req, res, next) => {
   }
 };
 
-// @desc    Forgot password
+// @desc    Forgot password — generate OTP and email it
 // @route   POST /api/v1/auth/forgot-password
 // @access  Public
 exports.forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
+    console.log('[forgotPassword] received request for:', email);
+    console.log('[forgotPassword] RESEND_API_KEY present:', !!process.env.RESEND_API_KEY);
 
-    const user = await User.findOne({ email });
-
+    const user = await User.findOne({ email: email?.trim().toLowerCase() });
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'No user found with this email',
-      });
+      console.log('[forgotPassword] user NOT found:', email);
+      return res.status(404).json({ success: false, message: 'No user found with this email' });
+    }
+    console.log('[forgotPassword] user found, generating OTP');
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetOtp = otp;
+    user.resetOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+    await user.save({ validateBeforeSave: false });
+    console.log('[forgotPassword] OTP saved to user, calling sendOtpEmail');
+
+    try {
+      const result = await sendOtpEmail(user.email, otp);
+      console.log('[forgotPassword] sendOtpEmail success, result:', JSON.stringify(result));
+    } catch (emailErr) {
+      console.error('[forgotPassword] sendOtpEmail FAILED:', emailErr?.message || emailErr);
+      console.error('[forgotPassword] full error:', emailErr);
+      user.resetOtp = undefined;
+      user.resetOtpExpiry = undefined;
+      await user.save({ validateBeforeSave: false });
+      return res.status(500).json({ success: false, message: 'Failed to send OTP email. Please try again.' });
     }
 
-    // Generate reset token (simplified - in production use crypto)
-    const resetToken = generateToken(user._id);
+    res.status(200).json({ success: true, message: 'OTP sent to your email' });
+  } catch (error) {
+    console.error('[forgotPassword] outer error:', error?.message || error);
+    next(error);
+  }
+};
 
-    // Send email (implement email service)
-    // For now, just return token
-    res.status(200).json({
-      success: true,
-      message: 'Password reset token sent',
-      resetToken, // Remove this in production
+// @desc    Verify OTP
+// @route   POST /api/v1/auth/verify-otp
+// @access  Public
+exports.verifyOtp = async (req, res, next) => {
+  try {
+    const { email, otp } = req.body;
+
+    const user = await User.findOne({
+      email: email?.trim().toLowerCase(),
+      resetOtp: otp?.trim(),
+      resetOtpExpiry: { $gt: Date.now() },
     });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+    }
+
+    res.status(200).json({ success: true, message: 'OTP verified' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reset password
+// @route   POST /api/v1/auth/reset-password
+// @access  Public
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    const user = await User.findOne({
+      email: email?.trim().toLowerCase(),
+      resetOtp: otp?.trim(),
+      resetOtpExpiry: { $gt: Date.now() },
+    }).select('+password');
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+    }
+
+    user.password = newPassword;
+    user.resetOtp = undefined;
+    user.resetOtpExpiry = undefined;
+    await user.save();
+
+    res.status(200).json({ success: true, message: 'Password reset successfully' });
   } catch (error) {
     next(error);
   }
