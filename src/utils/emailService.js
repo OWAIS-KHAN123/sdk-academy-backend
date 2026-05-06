@@ -1,33 +1,26 @@
-const nodemailer = require('nodemailer');
+// Email service — uses Brevo's transactional HTTPS API.
+// HTTPS works on Render free tier (port 443), unlike SMTP which is blocked.
+// No extra npm package required: Node 18+ has native fetch.
 
-const buildTransporter = () => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-    throw new Error('EMAIL_USER and EMAIL_PASSWORD env vars must be set');
-  }
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // upgrade via STARTTLS
-    auth: {
-      user: process.env.EMAIL_USER,
-      // Gmail App Password (16 chars). Spaces in the env value are tolerated by Gmail.
-      pass: process.env.EMAIL_PASSWORD,
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-  });
-};
+const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
 
 exports.sendOtpEmail = async (to, otp) => {
-  const transporter = buildTransporter();
+  if (!process.env.BREVO_API_KEY) {
+    throw new Error('BREVO_API_KEY env var is not set');
+  }
+  if (!process.env.EMAIL_USER) {
+    throw new Error('EMAIL_USER env var must be set (the verified Brevo sender email)');
+  }
 
-  const info = await transporter.sendMail({
-    from: `SDK Academy <${process.env.EMAIL_USER}>`,
-    to,
+  const payload = {
+    sender: { name: 'SDK Academy', email: process.env.EMAIL_USER },
+    to: [{ email: to }],
     subject: 'Your SDK Academy Password Reset Code',
-    text: `Your SDK Academy password reset code is: ${otp}\n\nThis code expires in 10 minutes. If you didn't request this, you can safely ignore this email.`,
-    html: `
+    textContent:
+      `Your SDK Academy password reset code is: ${otp}\n\n` +
+      `This code expires in 10 minutes. If you didn't request this, ` +
+      `you can safely ignore this email.`,
+    htmlContent: `
       <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e1e8f5;border-radius:12px;">
         <h2 style="color:#0a2463;margin-bottom:8px;">Password Reset</h2>
         <p style="color:#1e4d7b;margin-bottom:24px;">Use the OTP below to reset your SDK Academy password. It expires in <strong>10 minutes</strong>.</p>
@@ -37,7 +30,23 @@ exports.sendOtpEmail = async (to, otp) => {
         <p style="color:#94a3b8;font-size:13px;margin-top:24px;">If you didn't request this, you can safely ignore this email.</p>
       </div>
     `,
+  };
+
+  const response = await fetch(BREVO_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'api-key': process.env.BREVO_API_KEY,
+      'content-type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify(payload),
   });
 
-  return info;
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '');
+    throw new Error(`Brevo API ${response.status}: ${errorBody || response.statusText}`);
+  }
+
+  // Brevo returns { messageId: '<...@brevo.com>' }
+  return await response.json();
 };
