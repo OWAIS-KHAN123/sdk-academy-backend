@@ -1,14 +1,27 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
+
+const buildTransporter = () => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+    throw new Error('EMAIL_USER and EMAIL_PASSWORD env vars must be set');
+  }
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      // Gmail App Password (16 chars). Spaces in the env value are tolerated by Gmail.
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+};
 
 exports.sendOtpEmail = async (to, otp) => {
-  if (!process.env.RESEND_API_KEY) {
-    throw new Error('RESEND_API_KEY env var is not set');
-  }
-  const resend = new Resend(process.env.RESEND_API_KEY);
-  const result = await resend.emails.send({
-    from: 'SDK Academy <onboarding@resend.dev>',
+  const transporter = buildTransporter();
+
+  const info = await transporter.sendMail({
+    from: `SDK Academy <${process.env.EMAIL_USER}>`,
     to,
-    subject: 'Your Password Reset OTP',
+    subject: 'Your SDK Academy Password Reset Code',
+    text: `Your SDK Academy password reset code is: ${otp}\n\nThis code expires in 10 minutes. If you didn't request this, you can safely ignore this email.`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e1e8f5;border-radius:12px;">
         <h2 style="color:#0a2463;margin-bottom:8px;">Password Reset</h2>
@@ -20,8 +33,6 @@ exports.sendOtpEmail = async (to, otp) => {
       </div>
     `,
   });
-  if (result?.error) {
-    throw new Error(typeof result.error === 'string' ? result.error : JSON.stringify(result.error));
-  }
-  return result;
+
+  return info;
 };
