@@ -5,12 +5,17 @@ const buildTransporter = () => {
     throw new Error('EMAIL_USER and EMAIL_PASSWORD env vars must be set');
   }
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // upgrade via STARTTLS
     auth: {
       user: process.env.EMAIL_USER,
       // Gmail App Password (16 chars). Spaces in the env value are tolerated by Gmail.
       pass: process.env.EMAIL_PASSWORD,
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 };
 
